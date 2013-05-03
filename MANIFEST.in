@@ -1,0 +1,3 @@
+include vcsorm/static/css/*.css
+include vcsorm/static/js/*.js
+include vcsorm/static/templates/*.html
