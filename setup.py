@@ -22,7 +22,8 @@ setup(
             'static/templates/*.html',
         ]
     },
-    requires = [
+    install_requires = [
+        'vcs',
         'dulwich',
         'mercurial',
     ],
