@@ -10,7 +10,7 @@ This project is using https://github.com/codeinn/vcs for multiple VCS support.
 To find changesets you can use filter method
 
     from datetime import datetime
-    from vcsorm import VCSManager
+    from vcsorm.manager import VCSManager
     
     changesets = VCSManager('/path/to/your/repository').objects.filter(date__gt=datetime(2013,4,26))
 
