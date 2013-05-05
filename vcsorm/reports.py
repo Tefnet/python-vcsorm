@@ -2,6 +2,7 @@ import sys
 import datetime
 import shutil
 import string
+import collections
 import pkg_resources
 from optparse import OptionParser
 
@@ -55,16 +56,19 @@ class VCSDailyReport(VCSReport):
     SINGLE_FOOTER_TEMPLATE = pkg_resources.resource_filename('vcsorm','static/templates/single_footer.html')
     COMMITTER_TAB_TEMPLATE = pkg_resources.resource_filename('vcsorm','static/templates/committer_tab.html')
     DIFFSTAT_TEMPLATE = pkg_resources.resource_filename('vcsorm','static/templates/diffstat.html')
+    DIFFSTAT_DESC_TEMPLATE = pkg_resources.resource_filename('vcsorm','static/templates/diffstat_desc.html')
     SIMPLETABS_JS = pkg_resources.resource_filename('vcsorm','static/js/simpletabs_1.3.js')
     SIMPLETABS_CSS = pkg_resources.resource_filename('vcsorm','static/css/simpletabs.css')
     CSS_CUSTOM = pkg_resources.resource_filename('vcsorm','static/css/style.css')
 
-    def __init__(self, manager, day):
+    def __init__(self, manager, start_date, end_date=None, url_prefix=None):
         super(VCSDailyReport, self).__init__(manager)
-        self.day = day
+        self.start_date = start_date
+        self.end_date = end_date if end_date else self.start_date+datetime.timedelta(days=1)
+        self.url_prefix = url_prefix if url_prefix else "#"
 
     def fetch_changesets(self, *args, **kwargs):
-        return self._manager.objects.filter(date__range=[self.day, self.day+datetime.timedelta(days=1)]).order_by('committer_name')
+        return self._manager.objects.filter(date__range=[self.start_date, self.end_date]).order_by('committer_name')
 
     @IterStreamer
     def render(self):
@@ -74,16 +78,28 @@ class VCSDailyReport(VCSReport):
             vcsorm_simpletabs_css_content = self.render_template(self.SIMPLETABS_CSS),
             vcsorm_css_content = self.render_template(self.CSS_CUSTOM),
         )
-        committers = set()
+        committers = collections.OrderedDict()
         filelink_id = 0
+        committer_diffstat = {'added':0,'removed':0}
         for cs in self.fetch_changesets():
-            if cs.committer_name not in committers:
+            if cs.committer_name not in committers.keys():
                 if committers:
-                    # Close last tab
-                    yield self.render_template(self.SINGLE_CHANGESET_BOTTOM_TEMPLATE, vcsorm_changedfiles=vcsorm_changedfiles)
-                committers.add(cs.committer_name)
+                    # Next committer, close tab
+                    yield self.render_template(
+                        self.SINGLE_CHANGESET_BOTTOM_TEMPLATE,
+                        vcsorm_changedfiles=vcsorm_changedfiles,
+                        vcsorm_added=committer_diffstat['added'],
+                        vcsorm_removed=committer_diffstat['removed'],
+                    )
+                committer_diffstat = committers[cs.committer_name] = {'added':0,'removed':0}
                 vcsorm_changedfiles = ""
                 yield self.render_template(self.SINGLE_CHANGESET_TOP_TEMPLATE)
+
+            vcsorm_changedfiles += self.render_template(self.DIFFSTAT_DESC_TEMPLATE,
+                                                        message=cs.message,
+                                                        url_prefix=self.url_prefix,
+                                                        cid=cs.raw_id)
+
             for csf in cs.changed():
                 diff = VCSFileDiff(csf)
                 added, removed = diff.stats()
@@ -94,18 +110,31 @@ class VCSDailyReport(VCSReport):
                     'linkname': '',
                     'filelink': filelink_id,
                 }
-                vcsorm_changedfiles += self.render_template(self.DIFFSTAT_TEMPLATE, **diffstat)
+
+                committer_diffstat['added']+=added
+                committer_diffstat['removed']+=removed
+
                 diffstat['linkname'] = diffstat['filelink']
                 yield self.render_template(self.DIFFSTAT_TEMPLATE, **diffstat)
                 yield diff.as_html().encode('utf-8')
+
+                vcsorm_changedfiles += self.render_template(self.DIFFSTAT_TEMPLATE, **diffstat)
                 filelink_id+=1
 
         if committers:
             # Close last tab
-            yield self.render_template(self.SINGLE_CHANGESET_BOTTOM_TEMPLATE, vcsorm_changedfiles=vcsorm_changedfiles)
+            yield self.render_template(
+                self.SINGLE_CHANGESET_BOTTOM_TEMPLATE,
+                vcsorm_changedfiles=vcsorm_changedfiles,
+            )
         vcsorm_committers_tabs = ""
-        for committer in committers:
-            vcsorm_committers_tabs += self.render_template(self.COMMITTER_TAB_TEMPLATE, vcsorm_committer = committer)
+        for committer,stats in committers.iteritems():
+            vcsorm_committers_tabs += self.render_template(
+                                            self.COMMITTER_TAB_TEMPLATE,
+                                            vcsorm_committer = committer,
+                                            vcsorm_added = stats['added'],
+                                            vcsorm_removed = stats['removed'],
+                                      )
         
         yield self.render_template(self.SINGLE_FOOTER_TEMPLATE, vcsorm_committers_tabs=vcsorm_committers_tabs)
 
@@ -119,10 +148,23 @@ class VCSDailyReport(VCSReport):
         parser.add_option("-d", "--date",
                   action="store", dest="date", default=str(datetime.date.today()),
                   help="report date")
+        parser.add_option("-u", "--url-prefix",
+                  action="store", dest="url_prefix", default="",
+                  help="report date")
 
         (options, args) = parser.parse_args()
 
-        date = datetime.datetime.strptime(options.date, '%Y-%m-%d')
+        if " " in options.date:
+            start_date, end_date = options.date.split(' ',2)
+            start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+        else:
+            start_date = datetime.datetime.strptime(options.date, '%Y-%m-%d')
+            end_date = None
 
-        cls(options.repo_directory, day=date).render_to_file(options.filename)
+        cls(options.repo_directory,
+            start_date=start_date,
+            end_date=end_date,
+            url_prefix=options.url_prefix
+        ).render_to_file(options.filename)
 

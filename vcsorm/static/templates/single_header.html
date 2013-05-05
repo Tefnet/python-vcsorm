@@ -12,9 +12,11 @@ $vcsorm_simpletabs_js_content
 function toggle(el) {
     if (el.innerHTML === "-") {
         el.parentElement.style.width="20";
+        el.parentElement.style.overflowY="hidden";
         el.innerHTML="+";
     } else {
         el.parentElement.style.width="auto";
+        el.parentElement.style.overflowY="scroll";
         el.innerHTML="-";
     }
 }

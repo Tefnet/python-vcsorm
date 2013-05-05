@@ -1,8 +1,10 @@
-import vcs
+import logging
 import re
 import shutil
 from datetime import datetime
 import difflib
+
+import vcs
 
 
 #pkg_resources.resource_filename('vcsorm','conf')
@@ -23,7 +25,12 @@ class VCSFileDiff(object):
         history = fnode.history
         # TODO: Handle fnode from merge (won't be in history)
         # TODO: Handle IndexError (if fnode is in oldest revision)
-        return history[history.index(fnode.changeset)+1].get_node(fnode.path)
+        try:
+            return history[history.index(fnode.changeset)+1].get_node(fnode.path)
+        except ValueError:
+            # FIXME: Fails during date range 2013-04-24 - 2013-05-04
+            logging.error('Could not find %s for filenode %s  in history!', fnode.changeset, fnode)
+            return fnode.changeset.prev().get_node(fnode.path)
 
     @property
     def path(self):

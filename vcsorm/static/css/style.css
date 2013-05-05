@@ -5,7 +5,7 @@ p,div,table,tr,td,form,input { padding:0; margin:0; font-weight:normal; text-dec
 p { padding:8px 0; }
 
 /* Links */
-a { color:#1580AF; font-weight:bold; text-decoration:none; }
+a { color:#1580AF; font-weight:bold; text-decoration:none; white-space:nowrap; }
 a:link { }
 a:visited { }
 a:active,a:focus { outline:0; }
@@ -61,10 +61,12 @@ pre { font-family:monospace; }
 .simpleTabsNavigationFiles {
     position: fixed;
     left: 0;
-    top: 20;
+    top: 40;
     background-color:#e0e0e0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
     width: 20;
+    height: 90%;
 }
 h4 {
     font-size: 9pt;
@@ -78,14 +80,19 @@ h4 {
 }
 
 .diffstat_added {
-    color: #00ff00;
+    color: #008500;
+    font-weight: bold;
+    font-size: 9pt;
 }
 .diffstat_removed {
-    color: #ff0000;
+    color: #a60000;
+    font-weight: bold;
+    font-size: 9pt;
 }
 
 /* DiffHtml */
 
+a.changeset_url {color: black; }
 table.diff {font-family:Courier; border:medium; font-size: 8pt; width: 100%;}
 .diff_header {background-color:#e0e0e0}
 td.diff_header {text-align:right}
